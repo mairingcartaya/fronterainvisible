@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LA FÁBRICA DE ILEGALIDAD (p5.play)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+    
+    <!-- Importar p5.js v1.11.4 y p5.play v3 -->
+    <script src="libs/p5.js"></script>
+    <script src="libs/planck.min.js"></script>
+    <script src="libs/p5play.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #e5e5e5;
+            --accent-red: #ff0000;
+            --accent-yellow: #ffee00;
+            /* Variables Modal Unificado */
+            --neon-red: #ff0000;
+            --terminal-bg: #000000;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: #111;
+            font-family: 'Fira Code', monospace;
+            margin: 0;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+        }
+
+        /* FONDO */
+        .grid-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: linear-gradient(#ccc 1px, transparent 1px), linear-gradient(90deg, #ccc 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: -1;
+            opacity: 0.5;
+        }
+
+        /* HEADER UI - AJUSTADO A LA IZQUIERDA */
+        .header-ui {
+            position: absolute;
+            top: 30px;
+            left: 30px; /* Movido a la izquierda */
+            text-align: left; /* Texto alineado a la izquierda */
+            z-index: 50;
+            background: white;
+            padding: 15px 30px;
+            border: 4px solid black;
+            box-shadow: 8px 8px 0px black;
+        }
+
+        h1 {
+            font-family: 'Oswald', sans-serif;
+            font-size: 2.5rem;
+            text-transform: uppercase;
+            margin: 0;
+            line-height: 1;
+        }
+
+        /* EL CANVAS P5 */
+        main {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10;
+        }
+
+        /* CONTROLES */
+        #controls-area {
+            position: absolute;
+            bottom: 40px;
+            right: 40px; 
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .action-btn {
+            background: var(--accent-red);
+            color: white;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.5rem;
+            text-transform: uppercase;
+            padding: 15px 50px;
+            border: 4px solid black;
+            box-shadow: 10px 10px 0px black;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .action-btn:active {
+            transform: translate(5px, 5px);
+            box-shadow: 5px 5px 0px black;
+        }
+        .action-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: translate(10px, 10px);
+            box-shadow: none;
+        }
+
+        /* Línea tipo terminal encima del botón */
+        #law-computational-line {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.65rem;
+            line-height: 1.4;
+            color: #000000;
+            letter-spacing: 0.02em;
+            margin-bottom: 10px;
+            text-align: right;
+            max-width: min(92vw, 440px);
+            min-height: 1.2em;
+            white-space: normal;
+            word-break: break-all;
+        }
+
+        /* --- BOTÓN FUENTES --- */
+        #source-btn {
+            position: fixed;
+            bottom: 30px; left: 30px;
+            width: 40px; height: 40px;
+            background: black; color: white;
+            border: 2px solid white;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 1.2rem; cursor: pointer;
+            z-index: 200;
+            transition: transform 0.2s;
+            pointer-events: auto; 
+        }
+        #source-btn:hover { transform: scale(1.1); background: #ff0000; }
+
+        /* --- MODAL FUENTES --- */
+        #sources-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 300;
+            display: none; 
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            padding: 2rem;
+            cursor: auto; 
+            text-align: center;
+        }
+
+        #sources-modal h2 { 
+            color: #ff0000; 
+            font-size: 2rem; 
+            margin-bottom: 20px; 
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+        }
+
+        #sources-modal a { 
+            color: #FFE800; 
+            text-decoration: underline; 
+            display: block; 
+            margin: 10px 0; 
+            font-family: 'Fira Code', monospace; 
+            font-size: 0.9rem;
+            transition: color 0.3s;
+        }
+        #sources-modal a:hover { color: white; }
+        
+        .btn-close-modal {
+            margin-top: 2rem;
+            border: 1px solid white;
+            padding: 10px 20px;
+            background: transparent;
+            color: white;
+            font-family: 'Fira Code', monospace;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+        .btn-close-modal:hover { background: white; color: black; }
+
+        /* --- MODAL FINAL UNIFICADO --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.6); 
+            backdrop-filter: blur(2px);
+            z-index: 9999;
+            display: none; /* Controlado por JS */
+            justify-content: center; align-items: center;
+            opacity: 0;
+            animation: fadeIn 0.8s forwards 0.5s; 
+        }
+
+        .modal-box {
+            background-color: var(--terminal-bg);
+            border: 4px solid var(--neon-red); 
+            padding: 3rem; max-width: 800px; width: 90%;
+            text-align: center; position: relative;
+            box-shadow: 0 0 40px var(--neon-red), inset 0 0 20px rgba(255, 0, 0, 0.5);
+            transform: scale(0.9);
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards 0.8s, alarm-pulse 2s infinite alternate 1.3s;
+            opacity: 0;
+        }
+
+        .modal-title {
+            font-family: 'Oswald', sans-serif; font-size: 3.5rem; font-weight: 700;
+            text-transform: uppercase; color: white; background-color: var(--neon-red);
+            display: inline-block; padding: 10px 40px; margin-bottom: 2rem;
+            width: auto; letter-spacing: 2px;
+            box-shadow: 0 0 15px rgba(255,0,0,0.5); 
+        }
+
+        .modal-text {
+            color: var(--neon-red); font-family: 'Fira Code', monospace;
+            font-size: 1.1rem; line-height: 1.6; margin-bottom: 3rem;
+            text-transform: uppercase; font-weight: 700;
+            text-shadow: 0 0 5px rgba(255,0,0,0.4);
+        }
+
+        .modal-btn {
+            background: black; color: var(--neon-red);
+            font-family: 'Fira Code', monospace; font-size: 1.5rem; font-weight: bold;
+            text-transform: uppercase; padding: 15px 50px;
+            border: 4px solid var(--neon-red); cursor: pointer;
+            transition: all 0.2s ease; letter-spacing: 3px; display: inline-block;
+        }
+        .modal-btn:hover {
+            background: var(--neon-red); color: black;
+            box-shadow: 0 0 30px var(--neon-red); transform: scale(1.05);
+        }
+
+        @keyframes fadeIn { to { opacity: 1; } }
+        @keyframes popIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes alarm-pulse { 0% { box-shadow: 0 0 30px var(--neon-red), inset 0 0 10px var(--neon-red); } 100% { box-shadow: 0 0 50px var(--neon-red), inset 0 0 30px var(--neon-red); } }
+
+    </style>
+</head>
+<body>
+
+    <!-- Botón de Fuentes -->
+    <div id="source-btn" onclick="toggleSources()">🔗</div>
+
+    <!-- Modal de Fuentes -->
+    <div id="sources-modal">
+        <h2>EVIDENCIA DOCUMENTAL</h2>
+        <div class="text-left max-w-2xl font-mono text-sm">
+            <a href="https://scielo.conicyt.cl" target="_blank">[1] Scielo (2023): Respuesta del Estado a la crisis migratoria.</a>
+            <a href="https://www.jornada.com.mx" target="_blank">[2] La Jornada (2025): Migrantes intentan salir de Chile por amenazas.</a>
+            <a href="https://chile.iom.int" target="_blank">[3] OIM: Respuesta a situación de venezolanos.</a>
+            <a href="https://news.un.org/es" target="_blank">[4] ONU Noticias: Contexto de emergencia (6M desplazados).</a>
+            <a href="https://elpais.com" target="_blank">[5] El País (2025): Trata de personas se triplica en Chile.</a>
+            <a href="http://www.fiscaliadechile.cl" target="_blank">[6] Fiscalía Nacional: Informe Secuestros 2024.</a>
+        </div>
+        <button onclick="toggleSources()" class="btn-close-modal">CERRAR ARCHIVO</button>
+    </div>
+
+    <div class="grid-bg"></div>
+
+    <div class="header-ui">
+        <h1>IRREGULARIDAD FORZADA</h1>
+        <div class="text-xs font-bold mt-2 bg-yellow-300 inline-block px-2 text-black">
+            ESTABILIDAD DEL SISTEMA: <span id="stability-text">100%</span>
+        </div>
+    </div>
+
+    <main id="sketch-holder"></main>
+
+    <div id="controls-area">
+        <div id="law-computational-line" aria-live="polite"></div>
+        <button class="action-btn" id="build-btn" onclick="nextStep()">
+            APLICAR LEY
+        </button>
+    </div>
+
+    <!-- MODAL FINAL UNIFICADO -->
+    <div class="modal-overlay" id="final-modal-overlay">
+        <div class="modal-box">
+            <h2 class="modal-title">SISTEMA COLAPSADO</h2>
+            
+            <p class="modal-text">
+                HAS INTENTADO CONSTRUIR ORDEN SOBRE BASES INESTABLES. <br>
+                AL NEGAR VÍAS REALES, EL SISTEMA EMPUJA A LAS PERSONAS AL VACÍO.
+            </p>
+
+            <button class="modal-btn" onclick="window.location.href='laotredad.html'">
+                SIGUIENTE
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- VARIABLES GLOBALES ---
+        let blocks = []; 
+        let beams = [];  
+        let ground;      
+        let currentLvl = 0;
+        let isCollapsing = false;
+        let lawImages = []; 
+        
+        // 5 PISOS
+        const floorsData = [
+            { stability: 80 },
+            { stability: 60 },
+            { stability: 40 },
+            { stability: 20 },
+            { stability: 0 }
+        ];
+
+        const btn = document.getElementById('build-btn');
+        const stabilityUI = document.getElementById('stability-text');
+        const modalOverlay = document.getElementById('final-modal-overlay');
+        const computationalLine = document.getElementById('law-computational-line');
+
+        /** Frases según etapa (antes de ley1, antes de ley2, …) */
+        const LAW_STATUS_PHRASES = [
+            'migrar para sobrevivir',
+            'leyes que cierran puertas',
+            'compasión selectiva',
+            'victimas de un sistema',
+            'marginalidad forzada'
+        ];
+
+        let computationalTypingTimer = null;
+
+        function slugifyPhrase(phrase) {
+            return phrase
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/\s+/g, '-');
+        }
+
+        function setComputationalLineForStep(step) {
+            const idx = Math.min(Math.max(step, 0), LAW_STATUS_PHRASES.length - 1);
+            const phrase = LAW_STATUS_PHRASES[idx];
+            const full = '<subiendo:' + slugifyPhrase(phrase) + '>';
+            if (computationalTypingTimer) {
+                clearInterval(computationalTypingTimer);
+                computationalTypingTimer = null;
+            }
+            let i = 0;
+            computationalLine.textContent = '';
+            computationalTypingTimer = setInterval(() => {
+                i++;
+                computationalLine.textContent = full.slice(0, i);
+                if (i >= full.length) {
+                    clearInterval(computationalTypingTimer);
+                    computationalTypingTimer = null;
+                }
+            }, 22);
+        }
+
+        // --- PRELOAD ---
+        function preload() {
+            // Cargar las 5 imágenes de leyes
+            for(let i=1; i<=5; i++) {
+                lawImages.push(loadImage(`imgs/ley${i}.png`));
+            }
+        }
+
+        // --- SETUP DE P5.JS ---
+        function setup() {
+            p5play.logo = false;
+            let canvas = createCanvas(windowWidth, windowHeight);
+            canvas.parent('sketch-holder');
+            world.gravity.y = 25; 
+
+            ground = new Sprite(width/2, height + 50, width, 100, 'static');
+            ground.visible = false; 
+
+            let leftLimit = new Sprite(-50, height/2, 100, height * 2, 'static');
+            let rightLimit = new Sprite(width + 50, height/2, 100, height * 2, 'static');
+            leftLimit.visible = false;
+            rightLimit.visible = false;
+
+            createBeams();
+        }
+
+        function createBeams() {
+            let beamW = 20;
+            // AJUSTE: Altura aumentada a 320px
+            let beamH = 320; 
+            let centerX = width / 2;
+            let bottomY = height; 
+
+            // AJUSTE: Separación AUMENTADA a 340px (Gap total 680px)
+            let offset = 340;
+
+            let b1 = new Sprite(centerX - offset, bottomY - beamH/2, beamW, beamH, 'k');
+            b1.color = '#2a2a2a';
+            b1.stroke = 'black';
+            b1.strokeWeight = 2;
+            b1.pivotX = centerX - offset - beamW/2; 
+            b1.pivotY = bottomY;
+            beams.push(b1);
+
+            let b2 = new Sprite(centerX + offset, bottomY - beamH/2, beamW, beamH, 'k');
+            b2.color = '#2a2a2a';
+            b2.stroke = 'black';
+            b2.strokeWeight = 2;
+            b2.pivotX = centerX + offset + beamW/2; 
+            b2.pivotY = bottomY;
+            beams.push(b2);
+        }
+
+        // --- DIBUJADO (LOOP) ---
+        function draw() {
+            clear(); 
+
+            if (isCollapsing) {
+                if (beams[0].rotation > -85) {
+                    beams[0].rotation -= 3; 
+                    let rad = radians(beams[0].rotation);
+                    let dist = beams[0].h / 2;
+                    beams[0].x = beams[0].pivotX + Math.sin(rad) * dist + 10; 
+                    beams[0].y = beams[0].pivotY - Math.cos(rad) * dist;
+                }
+
+                if (beams[1].rotation < 85) {
+                    beams[1].rotation += 3; 
+                    let rad = radians(beams[1].rotation);
+                    let dist = beams[1].h / 2;
+                    beams[1].x = beams[1].pivotX - Math.sin(rad) * dist - 10;
+                    beams[1].y = beams[1].pivotY - Math.cos(rad) * dist;
+                }
+            } else {
+                if (currentLvl > 0) {
+                    // AJUSTE: Temblor muy suave (0.1)
+                    let shakeAmt = currentLvl * 0.1; 
+                    camera.x = width/2 + random(-shakeAmt, shakeAmt);
+                    camera.y = height/2 + random(-shakeAmt, shakeAmt);
+                } else {
+                    camera.x = width/2;
+                    camera.y = height/2;
+                }
+            }
+        }
+
+        // --- FUNCIÓN AGREGAR PISO ---
+        function nextStep() {
+            // Todos los bloques ya caídos: este clic (extra) inicia colapso y modal
+            if (currentLvl === floorsData.length) {
+                btn.innerText = "SISTEMA CRÍTICO";
+                btn.style.background = "black";
+                btn.disabled = true;
+                setTimeout(triggerCollapse, 2000);
+                currentLvl++;
+                return;
+            }
+            if (currentLvl > floorsData.length) return;
+
+            let data = floorsData[currentLvl];
+            stabilityUI.innerText = data.stability + "%";
+            if (data.stability < 40) stabilityUI.parentElement.style.backgroundColor = 'red';
+
+            // AJUSTE: 
+            // - Escala reducida a 600px. El hueco es aprox 680px.
+            //   Ahora son más pequeñas que el hueco, caerán si no se atascan.
+            let boxW = 600; 
+            let boxH = 125; 
+            let centerX = width/2;
+            
+            // AJUSTE DE CAOS: AUMENTADO
+            // Posición X aleatoria: +/- 150px de desviación para que caigan en lugares muy distintos
+            let randomX = random(centerX - 150, centerX + 150); 
+            
+            let startY = -200; 
+
+            // Crear bloque físico
+            let box = new Sprite(randomX, startY, boxW, boxH, 'd'); 
+            
+            // Asignar imagen
+            if (lawImages[currentLvl]) {
+                box.image = lawImages[currentLvl]; 
+                
+                // --- FIX: Forzar el tamaño de la imagen al dibujarla ---
+                box.draw = function() {
+                    push();
+                    imageMode(CENTER);
+                    // Dibujamos la imagen centrada y escalada EXACTAMENTE a las dimensiones del bloque físico
+                    if (this.image) {
+                        image(this.image, 0, 0, this.w, this.h);
+                    }
+                    pop();
+                };
+            } else {
+                box.color = '#b0b0b0'; 
+            }
+
+            box.bullet = true; 
+            
+            // AJUSTE DE ROTACIÓN: AUMENTADO (+/- 35 grados)
+            box.rotation = random(-35, 35); 
+            
+            box.strokeWeight = 0; 
+            box.friction = 0.8; 
+            box.bounciness = 0.1; 
+            box.density = 2;      
+
+            blocks.push(box);
+            currentLvl++;
+
+            btn.innerText = "APLICAR LEY";
+            setComputationalLineForStep(currentLvl);
+        }
+
+        // --- COLAPSO ---
+        function triggerCollapse() {
+            document.body.style.backgroundColor = "#111";
+            isCollapsing = true; 
+
+            blocks.forEach((b) => {
+                b.sleeping = false; 
+                b.applyTorque(random(-50, 50));
+            });
+
+            // Mostrar Modal Unificado
+            setTimeout(() => {
+                modalOverlay.style.display = "flex"; 
+            }, 3000);
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+        }
+
+        const sourcesModal = document.getElementById('sources-modal');
+        window.toggleSources = () => {
+            const display = sourcesModal.style.display === 'flex' ? 'none' : 'flex';
+            sourcesModal.style.display = display;
+        };
+
+        setComputationalLineForStep(0);
+
+    </script>
+</body>
+</html>

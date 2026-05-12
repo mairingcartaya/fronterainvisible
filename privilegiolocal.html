@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRIVILEGIO LOCAL | INTERROGATORIO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent-yellow: #FFE800;
+            --accent-red: #ff0000;
+            --bg-dark: #111;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #fff; /* Fondo blanco detrás del muro */
+            font-family: 'Fira Code', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            transition: background-color 2s ease;
+        }
+
+        /* --- CONTENEDOR DEL MURO FRAGMENTADO (PROCEDURAL) --- */
+        #wall-container {
+            position: absolute;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 10;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        /* Cada bloque del muro */
+        .wall-shard {
+            position: absolute;
+            background-image: url('imgs/editado.jpg');
+            background-size: 100vw 100vh; 
+            background-repeat: no-repeat;
+            transition: transform 1s cubic-bezier(0.5, 0, 0.2, 1), opacity 0.8s ease;
+            filter: grayscale(100%) brightness(0.4);
+            box-shadow: inset 0 0 2px rgba(0,0,0,0.5);
+        }
+
+        /* Clase para cuando el bloque cae */
+        .shard-fallen {
+            transform: translateY(120vh) rotate(var(--rotate-deg));
+            opacity: 0;
+        }
+
+        .noise-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; 
+            z-index: 50; /* Capa de ruido */
+            opacity: 0.08;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* --- VENTANA FLOTANTE --- */
+        .floating-window {
+            position: relative;
+            z-index: 60; /* Subido por encima del ruido para asegurar foco */
+            width: 90%;
+            max-width: 700px;
+            min-height: 500px; /* Aumentado min-height para acomodar textarea más grande */
+            background: rgba(10, 10, 10, 0.98); 
+            border: 2px solid var(--accent-yellow);
+            padding: 3rem;
+            box-shadow: 20px 20px 0px rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.3s ease, opacity 0.5s ease;
+        }
+
+        .window-header {
+            position: absolute;
+            top: -2px; left: -2px; right: -2px;
+            background: var(--accent-yellow);
+            color: black;
+            font-family: 'Oswald', sans-serif;
+            font-weight: bold;
+            padding: 5px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            letter-spacing: 1px;
+            font-size: 0.9rem;
+        }
+
+        .content-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        .fade-out { opacity: 0; }
+
+        h2.question-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: calc(2rem - 1px);
+            color: white;
+            margin-bottom: 2rem;
+            line-height: 1.1;
+            text-transform: uppercase;
+        }
+
+        .fact-container {
+            border-left: 4px solid var(--accent-red);
+            padding-left: 20px;
+        }
+        
+        .fact-title {
+            color: var(--accent-red);
+            font-family: 'Oswald', sans-serif;
+            font-size: calc(1.5rem - 1px);
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .fact-text {
+            color: #ffffff;
+            font-family: 'Fira Code', monospace;
+            font-size: calc(1rem - 1px);
+            line-height: 1.5;
+        }
+
+        .fact-quote {
+            margin-top: 15px;
+            font-size: calc(0.8rem - 1px);
+            color: #ffffff;
+            font-style: italic;
+            display: none;
+        }
+        .fact-quote:not(:empty) {
+            display: block;
+        }
+
+        /* --- TEXTAREA CORREGIDO --- */
+        textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid #555;
+            color: #FFE800 !important; /* FORZAR COLOR AMARILLO */
+            font-family: 'Fira Code', monospace;
+            font-size: 1.2rem;
+            padding: 10px 0;
+            outline: none;
+            resize: none;
+            height: 150px; /* AUMENTADO ESPACIO */
+            transition: border-color 0.3s;
+            margin-bottom: 1.5rem;
+            position: relative;
+            z-index: 70;
+            caret-color: #FFE800; /* Cursor amarillo */
+            line-height: 1.5;
+        }
+
+        textarea:focus { border-bottom-color: var(--accent-yellow); }
+        
+        /* Asegurar que el placeholder se vea pero sea distinto */
+        textarea::placeholder {
+            color: rgba(255, 232, 0, 0.4);
+        }
+
+        .btn-action {
+            background: white;
+            color: black;
+            border: none;
+            padding: 15px 40px;
+            font-family: 'Oswald', sans-serif;
+            font-weight: bold;
+            font-size: 1.2rem;
+            cursor: pointer;
+            width: 100%;
+            text-transform: uppercase;
+            transition: all 0.2s;
+            border: 2px solid white;
+        }
+
+        .btn-action:hover { background: black; color: white; border-color: white; }
+
+        .btn-next { background: var(--accent-yellow); border-color: var(--accent-yellow); }
+        .btn-next:hover { background: black; color: var(--accent-yellow); }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 0; left: 0;
+            height: 5px;
+            background: var(--accent-red);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* --- BOTÓN FUENTES --- */
+        #source-btn {
+            position: fixed;
+            bottom: 30px; left: 30px;
+            width: 40px; height: 40px;
+            background: black; color: white;
+            border: 2px solid white;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 1.2rem; cursor: pointer;
+            z-index: 200;
+            transition: transform 0.2s;
+            pointer-events: auto; 
+        }
+        #source-btn:hover { transform: scale(1.1); background: var(--accent-red); }
+
+        #sources-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 300;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            padding: 2rem;
+            cursor: auto; 
+        }
+        #sources-modal a { color: var(--accent-yellow); text-decoration: underline; display: block; margin: 10px 0; font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        #sources-modal h2 { color: var(--accent-red); font-size: 2rem; margin-bottom: 20px; font-family: 'Oswald', sans-serif;}
+
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        .shaking { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+
+        /* --- ESTADO FINAL (ESTILO LIMPIO) --- */
+        #final-container {
+            display: none; 
+            position: absolute; 
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 100;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 2s ease;
+            padding: 20px;
+        }
+        
+        .final-subtitle {
+            color: #444;
+            font-family: 'Fira Code', monospace;
+            font-size: 1.3rem;
+            margin-bottom: 3rem;
+            max-width: 800px;
+            line-height: 1.6;
+            font-weight: 500;
+        }
+        
+        .btn-restart {
+            border: 3px solid black;
+            background: transparent;
+            color: black;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.5rem;
+            padding: 20px 60px;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: bold;
+            transition: all 0.3s;
+            letter-spacing: 2px;
+        }
+
+        .btn-restart:hover {
+            background: black;
+            color: white;
+            transform: scale(1.05);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="noise-overlay"></div>
+    
+    <!-- CONTENEDOR DE LA CUADRÍCULA DEL MURO (PROCEDURAL) -->
+    <div id="wall-container"></div>
+
+    <!-- Botón de Fuentes -->
+    <div id="source-btn" onclick="toggleSources()">🔗</div>
+
+    <!-- Modal de Fuentes -->
+    <div id="sources-modal">
+        <h2>EVIDENCIA DOCUMENTAL</h2>
+        <div class="text-left max-w-2xl font-mono text-sm">
+            <a href="https://pubmed.ncbi.nlm.nih.gov/" target="_blank">[1] PubMed: Duelo Migratorio</a>
+            <a href="https://www.indh.cl/" target="_blank">[2] INDH: Discriminación Racial</a>
+            <a href="https://elpais.com/" target="_blank">[3] El País: Salud Mental y Crisis</a>
+            <a href="https://www.hrw.org/" target="_blank">[4] HRW: Emergencia Humanitaria</a>
+            <a href="https://www.amnesty.org/" target="_blank">[5] Amnistía Internacional</a>
+            <a href="https://www.ine.cl/" target="_blank">[6] INE: Boletín Empleo 2024</a>
+        </div>
+        <button onclick="toggleSources()" class="mt-8 border border-white px-4 py-2 hover:bg-white hover:text-black font-mono">CERRAR ARCHIVO</button>
+    </div>
+
+    <!-- VENTANA FLOTANTE -->
+    <div class="floating-window" id="quiz-window">
+        <div class="window-header">
+            <span>SYSTEM.CHECK_PRIVILEGE.EXE</span>
+            <span class="question-counter" id="counter">01 / 05</span>
+        </div>
+
+        <!-- Área de Contenido Dinámico -->
+        <div class="content-area" id="contentArea">
+            <!-- Se llena con JS -->
+        </div>
+
+        <div class="progress-bar" id="progress"></div>
+    </div>
+
+    <!-- FINAL (ESTILO LIMPIO) -->
+    <div id="final-container">
+        <p class="final-subtitle">
+            Vivir desconectado del dolor ajeno no es libertad, sino una jaula invisible. 
+            Al romperla, has permitido que la luz de otras realidades expanda los límites de tu mundo.
+        </p>
+        <button class="btn-restart" onclick="window.location.href='index.html'">
+            VOLVER AL INICIO
+        </button>
+    </div>
+
+    <script>
+        // --- LÓGICA DEL MURO FRAGMENTADO ---
+        const rows = 8;
+        const cols = 8;
+        const wallContainer = document.getElementById('wall-container');
+        let allShards = [];
+
+        function initWall() {
+            const width = window.innerWidth / cols;
+            const height = window.innerHeight / rows;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const shard = document.createElement('div');
+                    shard.classList.add('wall-shard');
+                    
+                    // Posicionamiento
+                    shard.style.width = `${100 / cols}%`;
+                    shard.style.height = `${100 / rows}%`;
+                    shard.style.left = `${(c / cols) * 100}%`;
+                    shard.style.top = `${(r / rows) * 100}%`;
+
+                    // Posición de la imagen de fondo para que calce perfecta
+                    shard.style.backgroundPosition = `${(c / (cols - 1)) * 100}% ${(r / (rows - 1)) * 100}%`;
+                    
+                    // Asignar rotación aleatoria para cuando caiga
+                    const randomRot = Math.random() * 60 - 30; // entre -30 y 30
+                    shard.style.setProperty('--rotate-deg', `${randomRot}deg`);
+
+                    wallContainer.appendChild(shard);
+                    allShards.push(shard);
+                }
+            }
+        }
+
+        function smashWall(percentage = 0.2) {
+            // Filtrar solo los bloques que aún no han caído
+            const intactShards = allShards.filter(s => !s.classList.contains('shard-fallen'));
+            
+            // Cuántos bloques romper en este turno
+            const totalToBreak = Math.ceil(allShards.length * percentage); 
+            
+            // Barajar array y tomar los N primeros
+            const shardsToFall = intactShards.sort(() => 0.5 - Math.random()).slice(0, totalToBreak);
+
+            shardsToFall.forEach((shard, index) => {
+                // Pequeño delay random para que no caigan todos al unísono exacto
+                setTimeout(() => {
+                    shard.classList.add('shard-fallen');
+                }, index * 10);
+            });
+        }
+        
+        // Iniciar Muro
+        initWall();
+
+
+        // --- LÓGICA NARRATIVA ---
+
+        const narrativeData = [
+            {
+                question: "¿Cómo cambiaría tu vida si tuvieras que huir solo y sin nada a un país que no eliges?",
+                factTitle: "PRIVILEGIO LOCAL",
+                factText: "Privilegio local es crecer en un país donde el caos no determina cada día, y desde esa estabilidad se juzga al migrante como si partiera del mismo punto. Muchas de las actitudes que se cuestionan no nacen de haber vivido años en modo supervivencia.",
+                quote: ""
+            },
+            {
+                question: "¿Crees que un chiste xenófobo o un meme de odio son inofensivos?",
+                factTitle: "LA CRUELDAD COTIDIANA",
+                factText: "En Chile, la xenofobia se volvió rutina, y lo que algunos llaman “humor” deja huellas reales: amenazas, humillaciones públicas, miedo a hablar, defenderse. En tiempos de crisis, esa crueldad funciona para unir al “nosotros” a costa del otro.",
+                quote: ""
+            },
+            {
+                question: "¿Has sentido el miedo paralizante de que te agredan o humillen en la calle solo por tu origen?",
+                factTitle: "TRAUMA DE SUPERVIVENCIA",
+                factText: "Lo que a veces se interpreta como agresividad o altanería suele ser trauma. Estudios sobre migración forzada muestran que vivir largos periodos bajo peligro constante mantiene activados patrones de supervivencia: alerta, defensividad y desconfianza.",
+                quote: ""
+            },
+            {
+                question: "¿Te has puesto en el lugar del migrante que cruza una selva a pie expuesto a peligros inimaginables?",
+                factTitle: "EL MITO DEL RETORNO",
+                factText: "Migrar no es comodidad, fue la única salida posible. Volver no es opción: no hay seguridad, no hay sustento, no hay futuro... Quien cruza fronteras a pie, con hambre y miedo, no eligió un destino mejor: huyó de uno peor.",
+                quote: ""
+            },
+            {
+                question: "¿Aceptarías ser explotado laboralmente si fuera la única opción para que tu familia sobreviva?",
+                factTitle: "LA EXPOLIACIÓN",
+                factText: "Muchos llegan sin documentos, sin redes y sin estabilidad mental. Esa vulnerabilidad los conduce a hacinamiento, jornadas laborales y sueldos abusivos. Son tratados como una molestia sin considerar que sobreviven a dos crisis: la que los expulsó y la que enfrentan aquí.",
+                quote: ""
+            }
+        ];
+
+        let currentIndex = 0;
+        let isFactMode = false; 
+
+        const windowEl = document.getElementById('quiz-window');
+        const contentArea = document.getElementById('contentArea');
+        const counter = document.getElementById('counter');
+        const progressBar = document.getElementById('progress');
+        const finalContainer = document.getElementById('final-container');
+        const sourcesModal = document.getElementById('sources-modal');
+
+        window.toggleSources = () => {
+            const display = sourcesModal.style.display === 'flex' ? 'none' : 'flex';
+            sourcesModal.style.display = display;
+        };
+
+        renderContent();
+
+        function renderContent() {
+            contentArea.classList.add('fade-out');
+
+            setTimeout(() => {
+                const data = narrativeData[currentIndex];
+                
+                if (!isFactMode) {
+                    contentArea.innerHTML = `
+                        <h2 class="question-title">${data.question}</h2>
+                        <textarea id="answer-input" placeholder="Escribe tu reflexión para golpear el muro..."></textarea>
+                        <button class="btn-action" onclick="submitAnswer()">GOLPEAR MURO</button>
+                    `;
+                    const inputEl = document.getElementById('answer-input');
+                    if (inputEl) {
+                        inputEl.addEventListener("keypress", function(event) {
+                            if (event.key === "Enter") { event.preventDefault(); submitAnswer(); }
+                        });
+                        // Asegurar foco
+                        setTimeout(() => inputEl.focus(), 100);
+                    }
+                } else {
+                    let quoteHtml = data.quote ? `<p class="fact-quote">${data.quote}</p>` : '';
+                    contentArea.innerHTML = `
+                        <div class="fact-container">
+                            <h3 class="fact-title">${data.factTitle}</h3>
+                            <p class="fact-text">${data.factText}</p>
+                            ${quoteHtml}
+                        </div>
+                        <button class="btn-action btn-next" style="margin-top:2rem;" onclick="nextStep()">SIGUIENTE GRIETA</button>
+                    `;
+                }
+                
+                contentArea.classList.remove('fade-out');
+                counter.innerText = `0${currentIndex + 1} / 0${narrativeData.length}`;
+                
+                const progressPct = ((currentIndex + (isFactMode ? 0.5 : 0)) / narrativeData.length) * 100;
+                progressBar.style.width = `${progressPct}%`;
+
+            }, 300);
+        }
+
+        function submitAnswer() {
+            const input = document.getElementById('answer-input');
+            if(input && input.value.trim() === "") {
+                input.placeholder = ">> DEBES ESCRIBIR ALGO PARA ROMPER EL MURO <<";
+                input.style.borderBottomColor = "var(--accent-red)";
+                return;
+            }
+
+            // 1. Efecto Shake ventana
+            windowEl.classList.add('shaking');
+            setTimeout(() => windowEl.classList.remove('shaking'), 400);
+
+            // 2. ROMPER MURO (Nueva función procedural)
+            // Calculamos porcentaje a romper (20% por pregunta aprox)
+            smashWall(0.2);
+
+            // 3. Cambiar a Dato
+            isFactMode = true;
+            renderContent();
+        }
+
+        function nextStep() {
+            currentIndex++;
+            isFactMode = false;
+
+            if (currentIndex < narrativeData.length) {
+                renderContent();
+            } else {
+                triggerFinalSequence();
+            }
+        }
+
+        function triggerFinalSequence() {
+            // Ocultar ventana interrogatorio
+            windowEl.style.transform = "scale(0.8) translateY(50px)";
+            windowEl.style.opacity = "0";
+            
+            const sBtn = document.getElementById('source-btn');
+            if(sBtn) sBtn.style.opacity = "0";
+
+            // Romper TODOS los bloques restantes para que quede blanco total
+            smashWall(1.0);
+
+            setTimeout(() => {
+                document.body.style.backgroundColor = "white"; // Asegurar fondo blanco
+                
+                finalContainer.style.display = "flex"; 
+                // Forzar reflow para transición
+                void finalContainer.offsetWidth; 
+                finalContainer.style.opacity = "1";
+            }, 500); 
+        }
+    </script>
+</body>
+</html>

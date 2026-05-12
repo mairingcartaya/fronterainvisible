@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LA OTREDAD | IDENTIDAD DEFENSIVA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #e5e5e5;
+            --text-color: #111;
+            --accent-red: #ff0000;
+            --highlight: #ffee00;
+            --neon-red: #ff0000;
+            --terminal-bg: #000000;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: url('imgs/laotredadfondo.png'), url('imgs/fondofondo.jpg');
+            background-size: contain, cover;
+            background-position: center, center;
+            background-repeat: no-repeat, no-repeat;
+            color: var(--text-color);
+            font-family: 'Fira Code', monospace;
+            margin: 0;
+            /* SIN SCROLL */
+            overflow: hidden; 
+            height: 100vh;
+            width: 100vw;
+            cursor: none; 
+            position: relative; 
+            user-select: none; 
+        }
+
+        /* --- CAPA DE "SUCIEDAD" (CANVAS) --- */
+        #scratch-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 50; 
+            mix-blend-mode: multiply;
+            pointer-events: auto; 
+        }
+        
+        /* CURSOR PERSONALIZADO */
+        #custom-cursor {
+            position: fixed;
+            top: 0; left: 0;
+            width: 140px; height: 140px;
+            border: 2px dotted rgba(255, 0, 0, 0.7); 
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,0,0,0.15) 0%, rgba(255,0,0,0) 70%);
+            pointer-events: none;
+            z-index: 100;
+            transform: translate(-50%, -50%);
+            mix-blend-mode: normal;
+            transition: transform 0.1s, width 0.1s, height 0.1s;
+        }
+        
+        body.is-scratching #custom-cursor {
+            width: 120px; height: 120px;
+            transform: translate(-50%, -50%) scale(0.95);
+            background: radial-gradient(circle, rgba(255,0,0,0.5) 0%, rgba(255,0,0,0) 80%);
+            border: 3px solid rgba(255, 0, 0, 1);
+        }
+
+        .hint-overlay {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 60;
+            color: white;
+            background: black;
+            padding: 20px;
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            font-size: 1.5rem;
+            pointer-events: none;
+            border: 2px solid var(--accent-red);
+            text-align: center;
+            opacity: 1;
+            transition: opacity 0.5s;
+        }
+
+        /* --- BARRA DE PROGRESO --- */
+        #cleaning-progress {
+            position: fixed;
+            bottom: 30px; right: 30px;
+            width: 250px;
+            z-index: 70;
+            pointer-events: none;
+            mix-blend-mode: difference; 
+            color: white;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+        }
+
+        .progress-label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            display: flex; justify-content: space-between;
+        }
+
+        .progress-track {
+            width: 100%; height: 15px;
+            border: 2px solid white;
+            background: transparent;
+            padding: 2px;
+        }
+
+        .progress-fill {
+            width: 0%; height: 100%;
+            background: white;
+            transition: width 0.1s linear;
+        }
+
+        /* Estado completado */
+        #cleaning-progress.completed .progress-track { border-color: #0011ff; }
+        #cleaning-progress.completed .progress-fill { background: #0011ff; }
+        #cleaning-progress.completed .progress-label { color: #0011ff; }
+
+        /* --- MODAL DE FUENTES --- */
+        #source-btn {
+            position: fixed;
+            bottom: 30px; left: 30px;
+            width: 40px; height: 40px;
+            background: black; color: white;
+            border: 2px solid white;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 1.2rem; cursor: pointer;
+            z-index: 200;
+            transition: transform 0.2s;
+            pointer-events: auto; 
+        }
+        #source-btn:hover { transform: scale(1.1); background: var(--accent-red); }
+
+        #sources-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 300;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            padding: 2rem;
+            cursor: auto; 
+        }
+        #sources-modal a { color: var(--highlight); text-decoration: underline; display: block; margin: 10px 0; font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        #sources-modal h2 { color: var(--accent-red); font-size: 2rem; margin-bottom: 20px; font-family: 'Oswald', sans-serif; }
+
+        /* --- ESTILO MODAL UNIFICADO --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.6); 
+            backdrop-filter: blur(2px);
+            z-index: 9999;
+            display: none; 
+            justify-content: center; align-items: center;
+            opacity: 0;
+            animation: fadeIn 0.8s forwards 0.5s; 
+        }
+
+        .modal-box {
+            background-color: var(--terminal-bg);
+            border: 4px solid var(--neon-red); 
+            padding: 3rem;
+            max-width: 800px; width: 90%;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 0 40px var(--neon-red), inset 0 0 20px rgba(255, 0, 0, 0.5);
+            transform: scale(0.9);
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards 0.8s, alarm-pulse 2s infinite alternate 1.3s;
+            opacity: 0;
+        }
+
+        .modal-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: white;
+            background-color: var(--neon-red);
+            display: inline-block;
+            padding: 10px 40px;
+            margin-bottom: 2rem;
+            width: auto;
+            letter-spacing: 2px;
+            box-shadow: 0 0 15px rgba(255,0,0,0.5); 
+        }
+
+        .modal-text {
+            color: var(--neon-red);
+            font-family: 'Fira Code', monospace;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 3rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            text-shadow: 0 0 5px rgba(255,0,0,0.4);
+        }
+
+        .modal-btn {
+            background: black;
+            color: var(--neon-red);
+            font-family: 'Fira Code', monospace;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            padding: 15px 50px;
+            border: 4px solid var(--neon-red);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            letter-spacing: 3px;
+            display: inline-block;
+        }
+
+        .modal-btn:hover {
+            background: var(--neon-red);
+            color: black;
+            box-shadow: 0 0 30px var(--neon-red);
+            transform: scale(1.05);
+        }
+
+        @keyframes fadeIn { to { opacity: 1; } }
+        @keyframes popIn { 
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes alarm-pulse {
+            0% { box-shadow: 0 0 30px var(--neon-red), inset 0 0 10px var(--neon-red); }
+            100% { box-shadow: 0 0 50px var(--neon-red), inset 0 0 30px var(--neon-red); }
+        }
+
+    </style>
+</head>
+<body id="main-body">
+
+    <div id="custom-cursor"></div>
+
+    <canvas id="scratch-canvas"></canvas>
+
+    <div class="hint-overlay" id="start-hint">
+        LA REALIDAD ESTÁ CENSURADA<br>
+        <span style="font-size: 1rem; color: var(--accent-red)">[ MANTÉN CLICK Y ROCÍA PARA REVELAR ]</span>
+    </div>
+
+    <!-- Barra de Progreso -->
+    <div id="cleaning-progress">
+        <div class="progress-label">
+            <span>VISIBILIDAD</span>
+            <span id="progress-percent">0%</span>
+        </div>
+        <div class="progress-track">
+            <div class="progress-fill" id="progress-bar"></div>
+        </div>
+    </div>
+
+    <!-- Botón de Fuentes -->
+    <div id="source-btn" onclick="toggleSources()">🔗</div>
+
+    <!-- Modal de Fuentes -->
+    <div id="sources-modal">
+        <h2>EVIDENCIA DOCUMENTAL</h2>
+        <div class="text-left max-w-2xl font-mono text-sm">
+            <a href="https://www.redalyc.org" target="_blank">[1] Redalyc: Imaginarios sociales de la alteridad en Chile.</a>
+            <a href="https://scielo.conicyt.cl" target="_blank">[2] Scielo (2023): Respuesta del Estado chileno a la crisis migratoria.</a>
+            <a href="https://dialnet.unirioja.es" target="_blank">[3] Dialnet: El duelo migratorio.</a>
+            <a href="https://pubmed.ncbi.nlm.nih.gov" target="_blank">[4] PubMed: Experiencias de duelo migratorio en Chile.</a>
+            <a href="#" target="_blank">[5] Refugio Latinoamericano (2025): Xenofobia en auge.</a>
+            <a href="https://scielo.conicyt.cl" target="_blank">[6] Scielo (2023): Confluencia de estigmas y marginalidad.</a>
+        </div>
+        <button onclick="toggleSources()" class="mt-8 border border-white px-4 py-2 hover:bg-white hover:text-black">CERRAR ARCHIVO</button>
+    </div>
+
+    <!-- MODAL FINAL UNIFICADO -->
+    <div class="modal-overlay" id="completion-modal">
+        <div class="modal-box">
+            <h2 class="modal-title">REFLEJO EXPUESTO</h2>
+            <p class="modal-text">
+                LA IDENTIDAD NACIONAL A MENUDO SE CONSTRUYE SOBRE LO QUE DECIDIMOS IGNORAR Y OCULTAR.
+            </p>
+            <button class="modal-btn" onclick="window.location.href='chivoexpiatorio.html'">
+                SIGUIENTE
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('scratch-canvas');
+        const ctx = canvas.getContext('2d');
+        const hint = document.getElementById('start-hint');
+        const customCursor = document.getElementById('custom-cursor');
+        const modal = document.getElementById('completion-modal');
+        const sourcesModal = document.getElementById('sources-modal');
+        
+        // Elementos de la barra de progreso
+        const progressContainer = document.getElementById('cleaning-progress');
+        const progressBar = document.getElementById('progress-bar');
+        const progressPercent = document.getElementById('progress-percent');
+        
+        let hasStarted = false;
+        let isDrawing = false;
+        
+        // Lógica de Progreso
+        let totalEffort = 0;
+        const GOAL_EFFORT = 1200; 
+        let isCompleted = false;
+
+        window.toggleSources = () => {
+            const display = sourcesModal.style.display === 'flex' ? 'none' : 'flex';
+            sourcesModal.style.display = display;
+        };
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            fillCanvas();
+        }
+
+        function fillCanvas() {
+            if(isCompleted) return; 
+
+            ctx.fillStyle = '#0f0f0f'; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const patternCanvas = document.createElement('canvas');
+            patternCanvas.width = 200;
+            patternCanvas.height = 200;
+            const pCtx = patternCanvas.getContext('2d');
+            
+            const imageData = pCtx.createImageData(200, 200);
+            const buffer = new Uint32Array(imageData.data.buffer);
+            
+            for (let i = 0; i < buffer.length; i++) {
+                const noise = Math.random() < 0.5 ? 0 : Math.floor(Math.random() * 50);
+                buffer[i] = (255 << 24) | (noise << 16) | (noise << 8) | noise;
+            }
+            pCtx.putImageData(imageData, 0, 0);
+
+            const pattern = ctx.createPattern(patternCanvas, 'repeat');
+            ctx.fillStyle = pattern;
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 0.3; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.globalAlpha = 1.0;
+        }
+
+        function scratch(x, y) {
+            if (isCompleted) return; 
+
+            if (!hasStarted) {
+                hasStarted = true;
+                hint.style.opacity = '0';
+                setTimeout(() => hint.style.display = 'none', 500);
+            }
+
+            totalEffort++;
+            let percent = Math.min(100, Math.floor((totalEffort / GOAL_EFFORT) * 100));
+            progressBar.style.width = percent + "%";
+            progressPercent.innerText = percent + "%";
+
+            if (percent >= 100 && !isCompleted) {
+                completeLevel();
+            }
+
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.globalAlpha = 0.7; 
+
+            ctx.beginPath();
+            ctx.arc(x, y, 30, 0, Math.PI * 2); 
+            ctx.fill();
+
+            const particles = 2500; 
+            for (let i = 0; i < particles; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const randomDist = Math.random(); 
+                const distance = 30 + (randomDist * 40); 
+                const offsetX = Math.cos(angle) * distance;
+                const offsetY = Math.sin(angle) * distance;
+                const particleSize = 1.5 + Math.random() * 2.5;
+
+                ctx.beginPath();
+                ctx.arc(x + offsetX, y + offsetY, particleSize / 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+        }
+
+        function completeLevel() {
+            isCompleted = true;
+            progressContainer.classList.add('completed');
+            progressPercent.innerText = "100%"; 
+            
+            document.body.style.cursor = 'auto'; 
+            customCursor.style.display = 'none'; 
+            modal.style.display = 'flex';
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('load', resizeCanvas);
+
+        window.addEventListener('mousemove', (e) => {
+            const pageX = e.pageX;
+            const pageY = e.pageY;
+            customCursor.style.left = e.clientX + 'px';
+            customCursor.style.top = e.clientY + 'px';
+            if (isDrawing) {
+                scratch(pageX, pageY);
+            }
+        });
+
+        window.addEventListener('mousedown', () => {
+            if(isCompleted) return;
+            isDrawing = true;
+            document.body.classList.add('is-scratching');
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDrawing = false;
+            document.body.classList.remove('is-scratching');
+        });
+
+        window.addEventListener('mouseleave', () => {
+            isDrawing = false;
+            document.body.classList.remove('is-scratching');
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if(isDrawing) e.preventDefault();
+            const touch = e.touches[0];
+            customCursor.style.left = touch.clientX + 'px';
+            customCursor.style.top = touch.clientY + 'px';
+            if (isDrawing) {
+                scratch(touch.pageX, touch.pageY);
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchstart', (e) => {
+            if(isCompleted) return;
+            isDrawing = true;
+            document.body.classList.add('is-scratching');
+            const touch = e.touches[0];
+            scratch(touch.pageX, touch.pageY);
+        }, { passive: false });
+
+        window.addEventListener('touchend', () => {
+            isDrawing = false;
+            document.body.classList.remove('is-scratching');
+        });
+
+        resizeCanvas();
+
+    </script>
+</body>
+</html>

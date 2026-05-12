@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XENOFOBIA | CONFLICTO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --noise-color: #000000;
+            --accent-red: #ff0000;
+            --accent-yellow: #ffee00;
+            --bg-grey: #e5e5e5;
+        }
+
+        body {
+            background-color: var(--bg-grey);
+            font-family: 'Oswald', sans-serif;
+            overflow: hidden;
+            margin: 0;
+            height: 100vh;
+            cursor: crosshair;
+            user-select: none;
+        }
+
+        /* TEXTURA DE RUIDO GLOBAL */
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+            opacity: 0.08;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* INSTRUCCIÓN (ABAJO AL CENTRO) */
+        .instruction-overlay {
+            position: absolute;
+            bottom: 10%; 
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 40;
+            text-align: center;
+            pointer-events: none;
+            mix-blend-mode: difference;
+            color: white;
+            transition: opacity 0.5s ease;
+            width: 90%; 
+        }
+
+        .blink-text {
+            animation: blink 3s infinite;
+        }
+        
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+        /* CONTENEDOR PRINCIPAL - LA PUERTA */
+        .gate-container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            z-index: 10;
+            transition: all 0.1s; 
+        }
+
+        .gate-container.gate-open {
+            pointer-events: none;
+        }
+
+        .panel {
+            flex: 1;
+            height: 100%;
+            position: relative;
+            transition: transform 1.5s cubic-bezier(0.19, 1, 0.22, 1), filter 0.3s ease;
+            cursor: pointer;
+            overflow: hidden;
+            background-color: transparent; 
+            border-right: 1px solid rgba(0,0,0,0.2);
+            pointer-events: auto;
+        }
+
+        /* --- CAPA 1: IMAGEN DE FONDO (BANDERA) --- */
+        .panel::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-size: cover;
+            background-repeat: no-repeat;
+            z-index: -2; 
+        }
+
+        /* Panel Izquierdo: CHILE */
+        #panel-left { z-index: 2; }
+        #panel-left::before {
+            background-image: url('imgs/Artboard4@2x.png');
+            background-color: #111;
+            background-position: right center;
+        }
+        
+        /* Panel Derecho: VENEZUELA */
+        #panel-right { z-index: 1; margin-left: -1px; }
+        #panel-right::before {
+            background-image: url('imgs/Artboard3@2x.png');
+            background-color: #222;
+            background-position: left center;
+        }
+
+        /* --- MASKING TAPE --- */
+        .masking-tape {
+            position: absolute;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60vw; 
+            height: 350px; 
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: 30; 
+            pointer-events: none; 
+            transition: opacity 0.5s ease 1s, transform 1.5s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        .tape-1 {
+            top: 25%; 
+            background-image: url('imgs/masking1.png');
+            transform: translate(-50%, -50%) rotate(-4deg);
+        }
+
+        .tape-2 {
+            top: 75%; 
+            background-image: url('imgs/masking2.png');
+            transform: translate(-50%, -50%) rotate(2deg);
+        }
+
+        .gate-open .tape-1 {
+            opacity: 0;
+            transform: translate(-150%, -50%) rotate(-20deg); 
+        }
+        .gate-open .tape-2 {
+            opacity: 0;
+            transform: translate(50%, -50%) rotate(20deg); 
+        }
+
+        /* ESTADOS DE SELECCIÓN Y ANIMACIONES */
+        .panel {
+            filter: grayscale(100%) contrast(120%);
+        }
+        .panel:hover {
+            filter: grayscale(0%) contrast(100%);
+        }
+        .panel.selected {
+            filter: grayscale(0%) contrast(110%);
+            z-index: 20;
+        }
+
+        @keyframes tremble {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .trembling {
+            animation: tremble 0.5s;
+            animation-iteration-count: 3;
+        }
+
+        .gate-open #panel-left { transform: translateX(-100%); }
+        .gate-open #panel-right { transform: translateX(100%); }
+
+        /* --- CAPA INFERIOR (CONTENIDO OCULTO) --- */
+        .hidden-layer {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 0;
+            background-color: #0a0a0a; 
+            overflow: hidden;
+        }
+
+        /* Grilla de fondo decorativa */
+        .bg-grid {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            opacity: 0.2;
+            pointer-events: none;
+        }
+        .bg-cell {
+            border: 1px solid #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Oswald', sans-serif;
+            font-size: 5rem;
+            color: #222;
+            font-weight: bold;
+            overflow: hidden;
+        }
+
+        /* Botón Actualizado - Estilo Unificado */
+        .cta-button {
+            /* Estética visual coherente con modales */
+            background: black; 
+            color: var(--accent-red); 
+            font-family: 'Fira Code', monospace; 
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            padding: 15px 50px;
+            border: 4px solid var(--accent-red); 
+            cursor: pointer;
+            letter-spacing: 3px;
+            box-shadow: none; /* Quitamos la sombra sólida antigua */
+            
+            /* Propiedades de animación/posición */
+            position: relative;
+            z-index: 100;
+            opacity: 0; 
+            transform: scale(0.9);
+            pointer-events: auto;
+            transition: all 0.2s ease;
+        }
+
+        .cta-button:hover {
+            background: var(--accent-red); 
+            color: black; 
+            box-shadow: 0 0 30px var(--accent-red); /* Resplandor */
+            transform: scale(1.05);
+        }
+
+        .gate-open + .hidden-layer .cta-button {
+            opacity: 1;
+            transform: scale(1);
+            transition-delay: 0.3s; 
+        }
+
+        /* Spray decorativo */
+        .spray-effect {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(2);
+            width: 400px; height: 300px;
+            background-image: url('imgs/red-spray.png'); 
+            background-size: contain; 
+            background-repeat: no-repeat;
+            background-position: center; 
+            opacity: 0; 
+            transition: opacity 1s ease 1s; 
+            z-index: 1; 
+            pointer-events: none;
+            mix-blend-mode: screen;
+        }
+
+        .gate-open + .hidden-layer .spray-effect {
+            opacity: 1; 
+        }
+
+        .version-text {
+            margin-top: 3rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.7rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            position: relative;
+            z-index: 10;
+        }
+        
+    </style>
+</head>
+<body>
+
+    <!-- Capa de Ruido -->
+    <div class="noise-overlay"></div>
+
+    <!-- Instrucción Flotante (Abajo al Centro) -->
+    <div class="instruction-overlay blink-text" id="main-instruction">
+        <h2 class="text-3xl md:text-5xl font-bold bg-black px-6 py-2 inline-block border-2 border-red-600 mb-4 shadow-lg">
+            [ ELIGE TU VISIÓN ]
+        </h2>
+        <br>
+        <p class="text-lg md:text-2xl font-mono bg-black text-white inline-block px-4 py-2 mt-2 border border-white">
+            SELECCIONA UNA BANDERA, MANTEN PRESIONADA LA TECLA SHIFT Y HAZ CLICK EN LA OTRA BANDERA
+        </p>
+    </div>
+
+    <!-- Contenedor de las Puertas -->
+    <div class="gate-container" id="gate">
+        <!-- Panel Izquierdo (Chile) -->
+        <div class="panel" id="panel-left" onclick="handleClick(this, 'left')"></div>
+
+        <!-- Panel Derecho (Venezuela) -->
+        <div class="panel" id="panel-right" onclick="handleClick(this, 'right')"></div>
+
+        <!-- Masking Tapes -->
+        <div class="masking-tape tape-1"></div>
+        <div class="masking-tape tape-2"></div>
+    </div>
+
+    <!-- Capa Inferior (Contenido Oculto) -->
+    <div class="hidden-layer">
+        <!-- Fondo Grilla Decorativa -->
+        <div class="bg-grid">
+            <div class="bg-cell">REALIDAD</div>
+            <div class="bg-cell"></div>
+            <div class="bg-cell"></div>
+            <div class="bg-cell">MITO</div>
+            <div class="bg-cell"></div>
+            <div class="bg-cell" style="color: #1a1a1a">CAOS</div>
+            <div class="bg-cell"></div>
+            <div class="bg-cell"></div>
+            <div class="bg-cell">ORDEN</div>
+            <div class="bg-cell"></div>
+            <div class="bg-cell" style="font-size: 8rem; color: #111;">VS</div>
+            <div class="bg-cell"></div>
+        </div>
+
+        <div class="spray-effect"></div> 
+        
+        <!-- Botón actualizado -->
+        <button class="cta-button" onclick="window.location.href='irregularidadforzada.html'">
+            COMENZAR
+        </button>
+    </div>
+
+    <script>
+        const leftPanel = document.getElementById('panel-left');
+        const rightPanel = document.getElementById('panel-right');
+        const gate = document.getElementById('gate');
+        const instruction = document.getElementById('main-instruction');
+
+        let leftActive = false;
+        let rightActive = false;
+
+        function handleClick(element, side) {
+            const isShift = window.event.shiftKey;
+
+            // Lógica "Aditiva" para el Shift.
+            // Si aprietas Shift, agregas selección. Si no, seleccionas solo uno.
+            if (side === 'left') {
+                leftActive = true; 
+                if (!isShift) {
+                    rightActive = false; // Resetear el otro lado si NO hay shift
+                }
+            } else {
+                rightActive = true;
+                if (!isShift) {
+                    leftActive = false; // Resetear el otro lado si NO hay shift
+                }
+            }
+
+            updateVisuals();
+            checkSuccess();
+        }
+
+        function updateVisuals() {
+            // Limpiar clases
+            leftPanel.classList.remove('trembling', 'selected');
+            rightPanel.classList.remove('trembling', 'selected');
+
+            // Aplicar seleccionado
+            if (leftActive) leftPanel.classList.add('selected');
+            if (rightActive) rightPanel.classList.add('selected');
+
+            // Efecto de temblor si solo hay uno seleccionado (indicando tensión)
+            if ((leftActive && !rightActive) || (!leftActive && rightActive)) {
+                if(leftActive) leftPanel.classList.add('trembling');
+                if(rightActive) rightPanel.classList.add('trembling');
+            }
+        }
+
+        function checkSuccess() {
+            if (leftActive && rightActive) {
+                // Éxito: Detener temblores y poner full color
+                leftPanel.classList.remove('trembling');
+                rightPanel.classList.remove('trembling');
+                
+                leftPanel.style.filter = "grayscale(0%) contrast(150%)";
+                rightPanel.style.filter = "grayscale(0%) contrast(150%)";
+
+                // Ocultar instrucciones inmediatamente
+                // IMPORTANTE: Removemos la clase de animación para que la opacidad surta efecto
+                instruction.classList.remove('blink-text');
+                instruction.style.opacity = '0';
+
+                // Abrir la puerta
+                setTimeout(() => {
+                    gate.classList.add('gate-open');
+                }, 500);
+            }
+        }
+    </script>
+</body>
+</html>

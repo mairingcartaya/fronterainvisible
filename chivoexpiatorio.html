@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHIVO EXPIATORIO | VIGILANCIA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&family=Oswald:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #dcdcdc; /* Gris un poco más oscuro para la base del concreto */
+            --text-color: #111;
+            --accent-red: #ff0000;
+            --accent-yellow: #ffee00;
+            --concrete-gray: #4a4a4a;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Fira Code', monospace;
+            margin: 0;
+            overflow: hidden;
+            cursor: none; 
+            height: 100vh;
+            width: 100vw;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+
+        /* --- TEXTURAS (CONCRETO / PAPEL SUCIO) --- */
+        
+        /* Capa 1: Ruido base (Grano de película/cemento) */
+        .noise-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 2;
+            opacity: 0.15; /* Más visible */
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            mix-blend-mode: overlay;
+        }
+
+        /* Capa 2: Manchas y Viñeta (Para dar profundidad de pared) */
+        .concrete-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 3;
+            background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.2) 100%),
+                        url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='roughPaper'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.04' numOctaves='5' result='noise'/%3E%3CfeDiffuseLighting in='noise' lighting-color='white' surfaceScale='2'%3E%3CfeDistantLight azimuth='45' elevation='60'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23roughPaper)' opacity='0.4'/%3E%3C/svg%3E");
+            mix-blend-mode: multiply;
+            opacity: 0.6;
+        }
+
+        /* FONDO (GRID DE IMÁGENES) */
+        .background-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            grid-template-rows: repeat(12, 1fr);
+            height: 100vh;
+            width: 100vw;
+            padding: 2rem;
+            box-sizing: border-box;
+            z-index: 1;
+            position: absolute;
+            gap: 1rem;
+            pointer-events: none;
+        }
+
+        .img-block {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.9;
+            /* Mezcla las imágenes con la textura de fondo para que parezcan impresas en la pared */
+            mix-blend-mode: multiply; 
+        }
+        
+        .img-block img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            filter: grayscale(100%) contrast(1.2); /* Alto contraste brutalista por defecto */
+            transition: filter 0.3s ease;
+        }
+
+        /* CLASE NUEVA: Para restaurar el color original en los títulos */
+        .img-block img.show-color {
+            filter: grayscale(0%) contrast(1.1); /* Color original con un poco de contraste */
+            mix-blend-mode: normal; /* Opcional: para que el color destaque más sobre el fondo gris */
+        }
+
+        /* EL FOCO / SPOTLIGHT */
+        #spotlight {
+            position: fixed;
+            top: 0; left: 0;
+            width: 450px; height: 450px; 
+            border-radius: 50%;
+            background: white; 
+            mix-blend-mode: difference; 
+            pointer-events: none;
+            z-index: 50;
+            transform: translate(-50%, -50%);
+            transition: width 0.2s, height 0.2s; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .hud-ring {
+            position: absolute; width: 90%; height: 90%;
+            border: 2px dashed black; border-radius: 50%;
+            animation: rotate 10s linear infinite;
+        }
+        .hud-crosshair { position: absolute; width: 100%; height: 2px; background: black; }
+        .hud-crosshair.v { transform: rotate(90deg); }
+
+        /* ESTADO DE ALERTA */
+        body.alert-mode {
+            background-color: #1a0000; 
+            animation: shake 0.5s infinite; 
+        }
+        
+        body.alert-mode #spotlight {
+            background: var(--accent-red); 
+            mix-blend-mode: normal; 
+            opacity: 0.9;
+            box-shadow: 0 0 50px var(--accent-red);
+        }
+
+        /* CURSOR */
+        #player-cursor {
+            position: fixed;
+            width: 20px; height: 20px;
+            background: var(--accent-red);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 60;
+            box-shadow: 0 0 10px var(--accent-red);
+        }
+
+        /* UI ELEMENTS */
+        #status-bar {
+            position: fixed;
+            top: 20px; left: 50%; transform: translateX(-50%);
+            font-family: 'Fira Code', monospace;
+            background: black; color: white;
+            padding: 5px 15px;
+            font-size: 0.8rem;
+            z-index: 100;
+            border: 2px solid var(--accent-red);
+            display: flex; gap: 20px; align-items: center;
+        }
+
+        #detection-meter {
+            position: fixed;
+            bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 300px; height: 12px;
+            background: #111;
+            border: 2px solid var(--accent-red);
+            z-index: 100;
+            display: none;
+        }
+        #detection-fill {
+            height: 100%; width: 0%;
+            background: var(--accent-red);
+            transition: width 0.1s linear;
+        }
+
+        /* FUENTES MODAL */
+        #source-btn {
+            position: fixed;
+            bottom: 30px; left: 30px;
+            width: 40px; height: 40px;
+            background: black; color: white;
+            border: 2px solid white;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 1.2rem; cursor: pointer;
+            z-index: 200;
+            transition: transform 0.2s;
+            pointer-events: auto; 
+        }
+        #source-btn:hover { transform: scale(1.1); background: var(--accent-red); }
+
+        #sources-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 300;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            padding: 2rem;
+            cursor: auto; 
+        }
+        #sources-modal a { color: var(--accent-yellow); text-decoration: underline; display: block; margin: 10px 0; font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        #sources-modal h2 { color: var(--accent-red); font-size: 2rem; margin-bottom: 20px; font-family: 'Oswald', sans-serif;}
+
+        /* CAJA CENTRAL (ESCALADA) */
+        .content-overlay {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 40;
+            pointer-events: none;
+            text-align: center;
+        }
+
+        .main-text {
+            background: white;
+            padding: 15px 30px; 
+            border: 4px solid black; 
+            box-shadow: 8px 8px 0 black;
+            transform: scale(1.1); 
+            max-width: 400px;
+        }
+
+        /* PANTALLA FALLA DEL SISTEMA */
+        #system-failure {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #1a0000;
+            z-index: 500;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            cursor: auto;
+        }
+
+        .failure-box {
+            background: #0a0a0a;
+            padding: 3rem;
+            border: 4px solid var(--accent-red);
+            box-shadow: 0 0 20px var(--accent-red), inset 0 0 20px var(--accent-red);
+            max-width: 800px;
+            animation: alarm-flash 0.3s infinite alternate;
+            position: relative;
+            z-index: 10;
+            transform: scale(0.85);
+            font-family: 'Fira Code', monospace;
+        }
+
+        .failure-bg {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            display: flex; flex-wrap: wrap; align-content: flex-start; justify-content: center;
+            opacity: 0.8; 
+            pointer-events: none;
+            overflow: hidden;
+        }
+        
+        .spam-word {
+            font-family: 'Fira Code', monospace;
+            color: #ff3333; 
+            font-size: 16px;
+            font-weight: 900;
+            margin: 4px;
+            opacity: 1; 
+            text-shadow: 0 0 5px rgba(255, 0, 0, 0.5); 
+            display: inline-block;
+        }
+
+        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            100% { transform: translate(-1px, -2px) rotate(-1deg); }
+        }
+        @keyframes alarm-flash {
+            0% { filter: brightness(1) contrast(1); transform: scale(0.85); }
+            100% { filter: brightness(1.2) contrast(1.5) hue-rotate(-10deg); transform: scale(0.87); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- TEXTURAS -->
+    <div class="noise-overlay"></div>
+    <div class="concrete-overlay"></div>
+    
+    <div id="player-cursor"></div>
+
+    <!-- FOCO -->
+    <div id="spotlight">
+        <div class="hud-ring"></div>
+        <div class="hud-crosshair"></div>
+        <div class="hud-crosshair v"></div>
+        <div id="spotlight-text" class="absolute text-xs font-bold tracking-widest mt-20">BUSCANDO...</div>
+    </div>
+
+    <!-- BARRA SUPERIOR -->
+    <div id="status-bar">
+        <span>ESTADO: <span id="status-text" class="text-green-500">INVISIBILE</span></span>
+        <span>|</span>
+        <span>PROX: <span id="prox-text">0%</span></span>
+        <span id="warning-msg" class="text-red-500 hidden animate-pulse ml-2">¡MUÉVETE!</span>
+    </div>
+
+    <!-- BARRA DE DETECCIÓN -->
+    <div id="detection-meter">
+        <div id="detection-fill"></div>
+    </div>
+
+    <!-- FONDO DE INVESTIGACIÓN POLICIAL (GRID DE IMÁGENES) -->
+    <div class="background-grid">
+        
+        <!-- --- BLOQUE 1: SUPERIOR (ALINEADO HORIZONTALMENTE) --- -->
+        
+        <!-- 1. TÍTULO: LA CONSTRUCCIÓN DEL CULPABLE (Izquierda) -->
+        <div class="img-block col-span-7 row-span-3 items-end justify-start pl-4 border-b-4 border-black z-0">
+            <!-- COLOR ORIGINAL RESTAURADO (clase show-color) -->
+            <img src="imgs/chivo1.png" alt="La Construcción del Culpable" class="show-color" style="transform: translateX(28px);">
+        </div>
+
+        <!-- 2. TEXTO: ANÁLISIS (Derecha) -->
+        <!-- CORRECCIÓN: Ajuste de posición (-90px) y escalado (1.15) -->
+        <div class="img-block col-start-6 col-span-7 row-span-3 items-end justify-end pr-4 opacity-90 z-10">
+            <img src="imgs/chivo2.png" alt="Texto Análisis" style="max-height: 100%; transform: translate(-80px, -90px) scale(1.15);">
+        </div>
+
+
+        <!-- --- BLOQUE 2: IZQUIERDA INFERIOR (BAJADO) --- -->
+
+        <!-- 3. TÍTULO: RENTABILIDAD DEL ODIO (Bajado a row 7) -->
+        <div class="img-block col-span-5 row-span-2 row-start-7 justify-start pl-4">
+            <!-- COLOR ORIGINAL RESTAURADO (clase show-color) -->
+            <img src="imgs/chivo3.png" alt="Rentabilidad del Odio" class="show-color" style="transform: translate(40px, -56px);">
+        </div>
+
+        <!-- 4. TEXTO: RENTABILIDAD (Bajado a row 9) -->
+        <div class="img-block col-span-5 row-span-3 row-start-9 justify-start pl-4 opacity-80">
+            <img src="imgs/chivo4.png" alt="Texto Rentabilidad" style="transform: translate(40px, -22px);">
+        </div>
+
+
+        <!-- --- BLOQUE 3: DERECHA INFERIOR (MANTENIDO) --- -->
+
+        <!-- 5. TÍTULO: PERCEPCIÓN VS REALIDAD (Mantenido en row 7) -->
+        <div class="img-block col-span-6 col-start-7 row-span-2 row-start-7 justify-end pr-4 text-right">
+            <!-- COLOR ORIGINAL RESTAURADO (clase show-color) -->
+            <img src="imgs/chivo5.png" alt="Percepción vs Realidad" class="show-color" style="transform: translateX(-52px);">
+        </div>
+
+        <!-- 6. TEXTO: ESTADÍSTICAS (Mantenido en row 9) -->
+        <div class="img-block col-span-6 col-start-7 row-span-3 row-start-9 justify-end pr-4 opacity-80">
+            <img src="imgs/chivo6.png" alt="Texto Estadísticas" style="transform: translate(-88px, 28px);">
+        </div>
+
+    </div>
+
+    <!-- TEXTO CENTRAL (ESCALADO) -->
+    <div class="content-overlay">
+        <div class="main-text">
+            <h2 class="text-2xl font-bold mb-2 bg-black text-white inline-block px-3 font-oswald tracking-wider">OBJETIVO</h2>
+            <p class="font-bold text-black uppercase text-sm mt-1 leading-tight border-b-4 border-red-600 pb-2 mb-2">
+                MANTENTE ESCONDIDO.
+            </p>
+            <p class="text-xs font-mono text-red-700 font-black">
+                SI ERES ATRAPADO, SERÁS ACUSADO.
+            </p>
+        </div>
+    </div>
+
+    <!-- BOTÓN FUENTES -->
+    <div id="source-btn" onclick="toggleSources()">🔗</div>
+
+    <!-- MODAL FUENTES -->
+    <div id="sources-modal">
+        <h2>EVIDENCIA DOCUMENTAL</h2>
+        <div class="text-left max-w-2xl font-mono text-sm">
+            <a href="https://scielo.org" target="_blank">[1] Scielo (2023): La construcción social del migrante como criminal.</a>
+            <a href="https://ojo-publico.com" target="_blank">[2] Ojo Público: Mensajes de odio aumentan 9 veces en elecciones.</a>
+            <a href="https://www.ine.gob.cl" target="_blank">[3] INE Censo 2024 & Defensoría Penal: Estadísticas delictuales reales.</a>
+            <a href="https://encuesta.uc.cl" target="_blank">[4] Encuesta Bicentenario UC (2024): Percepción de miedo.</a>
+        </div>
+        <button onclick="toggleSources()" class="mt-8 border border-white px-4 py-2 hover:bg-white hover:text-black">CERRAR ARCHIVO</button>
+    </div>
+
+    <!-- PANTALLA FALLA DEL SISTEMA -->
+    <div id="system-failure">
+        <div class="failure-bg" id="failure-bg-text"></div>
+        <div class="failure-box">
+            <h1 class="text-4xl md:text-6xl font-bold text-white mb-6 bg-red-600 px-4 inline-block tracking-wider">FALLA DEL SISTEMA</h1>
+            <p class="text-lg md:text-xl text-red-500 font-mono mb-8 font-bold">
+                HAS SIDO DETECTADO COMO UNA AMENAZA AL ORDEN ESTABLECIDO. LA VERDAD ES INCOMPATIBLE CON EL DISCURSO OFICIAL.
+            </p>
+            <button onclick="window.location.href='privilegiolocal.html'" class="border-4 border-red-600 bg-transparent text-red-600 font-bold text-xl py-3 px-8 hover:bg-red-600 hover:text-black uppercase cursor-pointer transition-colors tracking-widest">
+                SIGUIENTE
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ELEMENTOS
+        const spotlight = document.getElementById('spotlight');
+        const cursor = document.getElementById('player-cursor');
+        const body = document.body;
+        const statusText = document.getElementById('status-text');
+        const proxText = document.getElementById('prox-text');
+        const warningMsg = document.getElementById('warning-msg');
+        const spotLabel = document.getElementById('spotlight-text');
+        
+        const detectBar = document.getElementById('detection-meter');
+        const detectFill = document.getElementById('detection-fill');
+        const failureScreen = document.getElementById('system-failure');
+        const sourcesModal = document.getElementById('sources-modal');
+        const failureBgText = document.getElementById('failure-bg-text');
+
+        // GENERAR MURO DE TEXTO (SPAM)
+        function generateTextWall(container, count) {
+            let html = '';
+            for(let i=0; i<count; i++) {
+                let opacity = Math.random() * 0.4 + 0.6;
+                html += `<span class="spam-word" style="opacity:${opacity}">ACUSADO</span>`;
+            }
+            container.innerHTML = html;
+        }
+        
+        generateTextWall(failureBgText, 2500);
+
+        // VARIABLES DE ESTADO
+        let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2;
+        let spotX = 100, spotY = 100;
+        let targetX = Math.random() * window.innerWidth, targetY = Math.random() * window.innerHeight;
+        
+        let speed = 0.1; 
+        
+        let isCaught = false;
+        let lastMouseMoveTime = Date.now();
+        let chaseMode = false;
+        let detectionTime = 0; 
+        let gameOver = false;
+
+        // CONSTANTES
+        const SPOT_RADIUS = 225; 
+        const CATCH_RADIUS = 120; 
+        const IDLE_LIMIT = 1000; 
+        const DETECTION_LIMIT = 750; 
+
+        // MOUSE
+        document.addEventListener('mousemove', (e) => {
+            if (gameOver) return;
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            cursor.style.left = mouseX + 'px';
+            cursor.style.top = mouseY + 'px';
+            lastMouseMoveTime = Date.now();
+
+            if (!isCaught && chaseMode) {
+                chaseMode = false;
+                speed = 0.045; 
+                spotLabel.innerText = "BUSCANDO...";
+                warningMsg.classList.add('hidden');
+                statusText.innerText = "ESCAPANDO";
+                statusText.className = "text-yellow-500";
+            }
+        });
+
+        // FUENTES TOGGLE
+        window.toggleSources = () => {
+            const display = sourcesModal.style.display === 'flex' ? 'none' : 'flex';
+            sourcesModal.style.display = display;
+        };
+
+        // BUCLE PRINCIPAL
+        function update() {
+            if (gameOver) return;
+            const now = Date.now();
+            const dist = Math.hypot(mouseX - spotX, mouseY - spotY);
+            
+            const proximity = Math.max(0, 100 - (dist / 8));
+            proxText.innerText = Math.round(proximity) + "%";
+
+            // 1. INACTIVIDAD -> PERSECUCIÓN
+            if (!isCaught && !chaseMode && (now - lastMouseMoveTime > IDLE_LIMIT)) {
+                chaseMode = true;
+                speed = 0.15; 
+                spotLabel.innerText = "¡OBJETIVO FIJO!";
+                warningMsg.classList.remove('hidden');
+                statusText.innerText = "DETECTADO (INMÓVIL)";
+                statusText.className = "text-red-500 blink";
+            }
+
+            // 2. MOVIMIENTO DEL FOCO
+            if (chaseMode) {
+                targetX = mouseX;
+                targetY = mouseY;
+            } else if (!isCaught) {
+                if (Math.hypot(targetX - spotX, targetY - spotY) < 100) {
+                    targetX = Math.random() * window.innerWidth;
+                    targetY = Math.random() * window.innerHeight;
+                }
+            }
+            spotX += (targetX - spotX) * speed;
+            spotY += (targetY - spotY) * speed;
+            spotlight.style.left = spotX + 'px';
+            spotlight.style.top = spotY + 'px';
+
+            // 3. DETECCIÓN
+            if (dist < CATCH_RADIUS) {
+                if (!isCaught) {
+                    isCaught = true;
+                    body.classList.add('alert-mode'); 
+                    statusText.innerText = "¡CULPABLE!";
+                    statusText.className = "text-red-900 font-bold bg-white px-2";
+                    spotLabel.innerText = "IDENTIFICADO";
+                    spotlight.style.width = "400px"; 
+                    spotlight.style.height = "400px";
+                    detectBar.style.display = 'block';
+                }
+
+                detectionTime += 16;
+                let percentage = Math.min(100, (detectionTime / DETECTION_LIMIT) * 100);
+                detectFill.style.width = percentage + "%";
+
+                if (detectionTime >= DETECTION_LIMIT) {
+                    triggerSystemFailure();
+                }
+
+            } else {
+                // ESCAPE
+                if (isCaught && dist > SPOT_RADIUS) {
+                    isCaught = false;
+                    body.classList.remove('alert-mode'); 
+                    statusText.innerText = "INVISIBILE";
+                    statusText.className = "text-green-500";
+                    spotLabel.innerText = "BUSCANDO...";
+                    spotlight.style.width = "450px"; 
+                    spotlight.style.height = "450px";
+                    detectBar.style.display = 'none';
+                    detectionTime = 0; 
+                    detectFill.style.width = "0%";
+                }
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        function triggerSystemFailure() {
+            gameOver = true;
+            body.classList.remove('alert-mode'); 
+            
+            failureScreen.style.display = 'flex';
+            
+            spotlight.style.display = 'none';
+            cursor.style.display = 'none';
+            document.getElementById('status-bar').style.display = 'none';
+            detectBar.style.display = 'none';
+            document.querySelector('.background-grid').style.display = 'none';
+            document.querySelector('.content-overlay').style.display = 'none';
+        }
+
+        update();
+
+    </script>
+</body>
+</html>
